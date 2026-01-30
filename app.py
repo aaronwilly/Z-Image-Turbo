@@ -8,7 +8,7 @@ from diffusers import DiffusionPipeline
 print("Loading Z-Image-Turbo pipeline...")
 pipe = DiffusionPipeline.from_pretrained(
     "Tongyi-MAI/Z-Image-Turbo",
-    torch_dtype=torch.float16,
+    torch_dtype=torch.bfloat16,
     low_cpu_mem_usage=False,
     attn_implementation="sdpa",
 )
