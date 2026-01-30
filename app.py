@@ -1,19 +1,18 @@
+import time
 import torch
 import gradio as gr
 from diffusers import DiffusionPipeline
 
 # Load the pipeline once at startup
+# SDPA uses PyTorch's scaled_dot_product_attention (Flash Attention when available on Space's GPU)
 print("Loading Z-Image-Turbo pipeline...")
 pipe = DiffusionPipeline.from_pretrained(
     "Tongyi-MAI/Z-Image-Turbo",
-    torch_dtype=torch.bfloat16,
+    torch_dtype=torch.float16,
     low_cpu_mem_usage=False,
+    attn_implementation="sdpa",
 )
 pipe.to("cuda")
-
-# ======== AoTI compilation + FA3 ========
-# pipe.transformer.layers._repeated_blocks = ["ZImageTransformerBlock"]
-# spaces.aoti_blocks_load(pipe.transformer.layers, "zerogpu-aoti/Z-Image", variant="fa3")
 
 print("Pipeline loaded!")
 
@@ -23,6 +22,7 @@ def generate_image(prompt, height, width, num_inference_steps, seed, randomize_s
         seed = torch.randint(0, 2**32 - 1, (1,)).item()
     
     generator = torch.Generator("cuda").manual_seed(int(seed))
+    t0 = time.perf_counter()
     image = pipe(
         prompt=prompt,
         height=int(height),
@@ -31,7 +31,8 @@ def generate_image(prompt, height, width, num_inference_steps, seed, randomize_s
         guidance_scale=0.0,
         generator=generator,
     ).images[0]
-    
+    elapsed = time.perf_counter() - t0
+    print(f"Generated image in {elapsed:.2f}s (seed={seed}, steps={num_inference_steps}, {int(width)}x{int(height)})")
     return image, seed
 
 # Example prompts
