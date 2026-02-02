@@ -1,0 +1,9 @@
+# PyPI-only deps for offline wheel download (no git URLs).
+# torch is NOT here: download_wheels.ps1 gets torch 2.10.0 from PyTorch CUDA index (cu126).
+# Then offline: install_offline.ps1 installs torch from wheels, then -r requirements-offline.txt
+diffusers
+transformers
+accelerate
+safetensors
+gradio[mcp]
+kernels

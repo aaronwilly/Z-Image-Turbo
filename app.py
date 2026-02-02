@@ -1,16 +1,51 @@
+import os
 import time
 import torch
 import gradio as gr
 from diffusers import DiffusionPipeline
 
+# Model: env override (path to snapshot), else HF cache in models_cache, else Hugging Face hub
+_MODEL_ID = "Tongyi-MAI/Z-Image-Turbo"
+_MODEL_CACHE = "models_cache"
+_SNAPSHOTS_DIR = os.path.join(_MODEL_CACHE, "models--Tongyi-MAI--Z-Image-Turbo", "snapshots")
+# Require this file so we use a complete snapshot (not an incomplete one)
+_REQUIRED_FILE = os.path.join("text_encoder", "model-00001-of-00003.safetensors")
+
+
+def _find_complete_snapshot():
+    """Pick a snapshot that has full weights (not just refs/index)."""
+    if not os.path.isdir(_SNAPSHOTS_DIR):
+        return None
+    for rev in os.listdir(_SNAPSHOTS_DIR):
+        path = os.path.join(_SNAPSHOTS_DIR, rev)
+        if os.path.isdir(path) and os.path.isfile(os.path.join(path, _REQUIRED_FILE)):
+            return path
+    return None
+
+
+if os.environ.get("Z_IMAGE_MODEL_PATH"):
+    MODEL_ID = os.environ.get("Z_IMAGE_MODEL_PATH")
+    _LOCAL_ONLY = True
+elif _find_complete_snapshot() is not None:
+    MODEL_ID = _find_complete_snapshot()
+    _LOCAL_ONLY = True
+else:
+    MODEL_ID = _MODEL_ID
+    _LOCAL_ONLY = False
+
+# GPU only: require CUDA
+if not torch.cuda.is_available():
+    raise RuntimeError("CUDA is required. Install PyTorch 2.10.0 with CUDA (e.g. pip install torch==2.10.0 --index-url https://download.pytorch.org/whl/cu126).")
+
 # Load the pipeline once at startup
 # SDPA uses PyTorch's scaled_dot_product_attention (Flash Attention when available on Space's GPU)
 print("Loading Z-Image-Turbo pipeline...")
 pipe = DiffusionPipeline.from_pretrained(
-    "Tongyi-MAI/Z-Image-Turbo",
+    MODEL_ID,
     torch_dtype=torch.bfloat16,
     low_cpu_mem_usage=False,
     attn_implementation="sdpa",
+    local_files_only=_LOCAL_ONLY,
 )
 pipe.to("cuda")
 
